@@ -1,0 +1,31 @@
+        2 function myLoopMatrix(radii ,dropletcount, osmolaritybase, osmolaritytop)
+        - 
+       76 radiivector = radii * ones(dropletcount,1)
+        - 
+        2 dropletnum = Int(dropletcount/2)
+        - 
+        2 ix = range(0, step = 2* radii, stop =  2 * radii * dropletnum - radii)
+        2 ix = collect(ix)
+       38 iy = zeros(1,dropletnum)
+       38 iz = zeros(1,dropletnum)
+        - 
+        2 jx = range(radii, step = 2*radii, stop = 2*radii*dropletnum)
+        2 jx = collect(jx)
+        2 jy = repeat([sqrt(3*radii^2)], 1, dropletnum)
+       38 jz = zeros(1,dropletnum)
+        - 
+      228 velocities = zeros(dropletcount, 3)
+        - 
+        - 
+        2 loopmatrix = [[[ix  iy'  iz'] ; [jx  jy' jz']]  velocities]
+        - 
+        - 
+       38 osmolaritybase = osmolaritybase * ones(dropletnum,1)
+       38 osmolaritytop = osmolaritytop * ones(dropletnum,1)
+        2 osmolarities = [osmolaritybase ; osmolaritytop]
+        - 
+        2 loopmatrix = [radiivector osmolarities loopmatrix ]
+        - 
+        - end
+        - 
+        - 

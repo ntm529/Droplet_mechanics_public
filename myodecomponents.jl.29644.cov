@@ -1,0 +1,234 @@
+        - module myODEcomponents
+        - export myDropvecDistances, myDropvecRadius_Osmolarity
+        - using LinearAlgebra
+        - 
+        - boolean_osm = false
+        - 
+    89454 function myDropvecDistances(droplet_locations, dropletcount, boolean_distances, boolean_norms, radii, L, dimensions, comradii, bilayer_spring_distance, norm_combinations)
+        - 
+        - 
+        - 
+        - 
+        -     # Get the droplet distances first within this set up for loop: UNDER CONSTRUCTION
+        - 
+        -     # Get the cartesian distance between all droplets 
+    89454     distance_combinations = reshape(droplet_locations, (dropletcount, :));
+    89454     distance_combinations = repeat(distance_combinations,dropletcount,1);
+    89454     distance_combinations = reshape(distance_combinations,(dropletcount,:));
+    89454     distance_combinations = distance_combinations[boolean_distances]
+    89454     distance_combinations = reshape(distance_combinations,(dropletcount-1,:))';
+   178908     distance_combinations = distance_combinations .- droplet_locations;
+        - 
+        - 
+        - 
+        -     # Get the norm distance between all droplets
+        - 
+        -     # display(norm_combinations)
+   178908     for i in 1:dropletcount-1
+  6619596         for j in 1:dropletcount
+125772324             zed = view(distance_combinations,j:dropletcount:size(distance_combinations,1),i)
+125772324             C =norm(zed,2)
+128992668             norm_combinations[j,i] = C
+        -         end
+        -     
+        -     end
+        -     
+        -     #display(norm_combinations)
+        -     # This line of code might be necessary in the future
+        -     # norm_combinations[isnan.(norm_combinations)] .= 0
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        -    
+        - 
+        -     #Get the normalized directional vector (ranges between 0 and 1) for all droplets
+   178908     direction = distance_combinations./(repeat(norm_combinations,dimensions,1));
+        - 
+        -    
+        -     
+        - 
+        - 
+   178908     for i in 1: length(radii)
+  3399252          k = 1 
+  6709050          for j in 1:(i-1)
+ 62886162             comradii[i,k] = (radii[j])         
+        -             
+        -                       
+        -         
+ 62886162             bilayer_spring_distance[i,k] = L * (radii[j] + radii[i])          
+ 62886162             bilayer_spring_distance[i+dropletcount,k] = bilayer_spring_distance[i,k]      
+ 62886162             bilayer_spring_distance[i+2*dropletcount,k] = bilayer_spring_distance[i,k]  
+        -                 
+        - 
+        -             
+        - 
+122462526             k = k +  1
+        -         end
+  6709050          for j in i+1:length(radii)
+ 62886162             comradii[i,k] = (radii[j])        
+        - 
+        -                      
+ 62886162             bilayer_spring_distance[i,k] = L * (radii[j] + radii[i])          
+ 62886162             bilayer_spring_distance[i+dropletcount,k] = bilayer_spring_distance[i,k]      
+ 62886162             bilayer_spring_distance[i+2*dropletcount,k] = bilayer_spring_distance[i,k]   
+        - 
+        -     
+        -        
+ 66195960             k = k +  1
+        -         end
+        -     end  
+        -     
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        -         
+        -     
+        -     
+        -     
+        - 
+        - 
+        - 
+    89454     ρ = repeat(radii, 1, size(radii,1))
+        -     # print("rho is:")
+        -     # display(size(ρ,1))
+        -     
+    89454     radii_combinations = ρ[.~I(size(ρ,1))] ; 
+    89454     radii_combinations = reshape(radii_combinations, size(ρ,1)-1, size(ρ,2))'
+        -     # display(radii_combinations)
+   178908     radii_combinations = radii_combinations .+ radii 
+        -     # display(radii_combinations)
+        - 
+    89454     logic_spring = (radii_combinations .-  broadcast(abs, norm_combinations))  .>= 0 
+    89454     logic_spring = repeat(logic_spring,dimensions,1);
+        -   
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+    89454     return comradii, distance_combinations, norm_combinations, direction, logic_spring , bilayer_spring_distance
+        - 
+        - end
+        - # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        - 
+    89454 function myDropvecRadius_Osmolarity(comradii, radii, osmolarities, D, dropletcount, norm_combinations, normvelocity, boolean_osm, t, sphere_intersection)
+        - 
+        - 
+        -     # The sphere intersection evaluation should first be turned into a logical matrix, and then be operated on to get numerical results for circular intersections
+        -     
+        - 
+        - 
+        -      #CASE 1: Simplest case where near circle is outside of the radius of,...
+        -     # far circle
+   178908     @.sphere_intersection = (radii .+ comradii-norm_combinations) .>= 0 ;
+        - 
+        -     #CASE 2: near circle is fully inside radius of the far circle
+   178908     @.sphere_intersection = sphere_intersection .* ((norm_combinations .+ radii .- comradii) .>= 0 );
+        - 
+        -     #CASE 3: far circle is completely inside the near circle
+   178908     @.sphere_intersection = sphere_intersection .* ((norm_combinations .+ comradii .- radii) .>= 0 );
+        - 
+        -   
+        - 
+        -    
+        - 
+        -     # Despite this, there are some times very small values below 
+        - 
+        -     # pre-allocate this matrix
+        -     # sphere_intersection = zeros(n)
+        -     #@. will make julia try to devectorize line
+        -     # Initialize sphere_intersection -------> use the devectorizing @. to get it to work.
+        - 
+        -     #Now with the logical values set up, show the distance at which the sphere intersection is occuring
+   178908     @.sphere_intersection = sphere_intersection .* ( 4*norm_combinations.^2 .*radii.^2 .- (norm_combinations.^2-comradii.^2 .+ radii.^2).^2)
+        - 
+        - 
+        - 
+        - 
+        - 
+        -     # bilayer_spring_distance = (comradii.+radii);
+        - 
+   178908     radius = 1 ./(2*norm_combinations) .* sqrt.(sphere_intersection); #radius of intersection
+        -     
+   178908     circular_area = pi * radius.^2; #circular area of intersection
+    89454     circular_area[isnan.(circular_area)] .= 0; #dealing with case where circular area is NaN
+        - 
+    89454     comosm = repeat(osmolarities,1,dropletcount);
+    89454     comosm = comosm[.~I(dropletcount)] ;
+    89454     comosm = reshape(comosm,dropletcount-1,:)';
+   178908     comosm = -1 *(comosm .- osmolarities);
+        - 
+        - 
+   178908     J = D * circular_area .* comosm;
+        - 
+    89454     J = sum(J, dims= 2);
+        - 
+        - 
+   178908     volume = 4/3 * pi * radii.^3;
+        - 
+   178908     moles = osmolarities .* volume;
+        - 
+    89454     volume = volume + J;
+   178908     radiinew = (3/(4*pi) * volume).^(1/3);
+   178908     osmnew = moles./volume;
+        - 
+    89454     dradii =  radiinew - radii
+    89454     dosmolarities = osmnew - osmolarities
+        - 
+        - #adjust n threshold 
+        - # >> SEE HERE, boolean_osm is being listed as "false on re-runs, needs to stay "true"    
+        - # global boolean_osm = false
+        - # >>>>>>>>>> CURRENT ISSUE - Boolean does not stay "true" and seems to reset to "false" <<<<<<<<<<<<
+    89454 if (t > 0.1 && normvelocity/dropletcount <= 1e-4)  
+        4     boolean_osm[1] = 1.0
+        - end
+        - 
+        - 
+    89454 if norm(boolean_osm) < 1.0 
+   382432     fill!(dradii,0.0)
+   382432     fill!(dosmolarities,0.0)
+        - end
+        - 
+    89454     return  dradii, dosmolarities
+        - 
+        - # >>>>>>>>>> CURRENT ISSUE - Boolean does not stay "true" and seems to reset to "false" <<<<<<<<<<<<
+        - 
+        - 
+        - end
+        - 
+        - 
+        - end

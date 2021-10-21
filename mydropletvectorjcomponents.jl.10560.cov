@@ -1,0 +1,186 @@
+        1 module MyDropletVectorJComponents
+        - include("myodecomponents.jl")
+        - using .myODEcomponents
+        - using LinearAlgebra
+        - export mydropfun!, myOvitoPrint!
+        - 
+        - 
+    44727 function mydropfun!(du,u, p, t)
+    44727     ϕ, ζ , sphere_intersection, norm_combinations, m, k, L, γ, dropletcount, dimensions, D, boolean_osm, comradii, bilayer_spring_distance = p;
+        -     
+        -     # Extract the values for radii, osmolarities, positions and velocities
+    44727     radii = u[1:dropletcount]
+        -     # display(radii)
+    44727     osmolarities = u[Int(dropletcount+1):Int(2*dropletcount)]
+        -     # display(osmolarities)
+    44727     positions = u[Int(2*dropletcount+1) : Int(dimensions * dropletcount + 2 * dropletcount)];
+        -     # display(positions)
+    44727     velocities = u[(2*dropletcount + dropletcount * dimensions + 1) : end]
+        -     # display(velocities)
+        - 
+        -      # ================================================
+        - 
+    44727     params =  myDropvecDistances(positions, dropletcount, ϕ , ζ, radii, L, dimensions, comradii, bilayer_spring_distance, norm_combinations); # Returns, in this order: distance_combinations, norm_combinations, direction, radii_combinations , logic_spring
+    44727     comradii = params[1];
+    44727     distance_combinations = params[2];
+    44727     norm_combinations = params[3];
+    44727     direction = params[4] ;
+    44727     logic_spring = params[5];
+    44727     bilayer_spring_distance = params[6]; 
+        - 
+    44727     dvelocities = sum( (logic_spring .* direction .* -k .* (abs.(bilayer_spring_distance.*direction) .- abs.(distance_combinations)) ), dims = 2) - γ .*  velocities
+        - 
+        -     #This will become important when making osmolarity activate at the right time 
+        -     #The gradient should be tested as overall increasing or decreasing somehow, ask prof. later if there's a good function to use? 
+        -     #This gradient being negative is one half of the puzzle
+        -     # In addition we will calculate the velocity_norm and have velocity_norm -------> 0 
+    44727     normvelocity = norm(velocities)
+        -     # display(∇velocity)
+        -     # display(normvelocity)
+        -     #display(dvelocities)
+        -     # ================================================
+        -     # Perform the osmolarity component
+    44727     params2 = myDropvecRadius_Osmolarity(comradii, radii, osmolarities, D, dropletcount, norm_combinations, normvelocity, boolean_osm, t, sphere_intersection)
+        - 
+    44727     dradii = params2[1]
+    44727     dosmolarities = params2[2]    
+        -     
+        -     
+        -     
+        -     
+    44727     dposition = velocities
+        -     # println("Gradient is", gradient) 
+        - 
+        - 
+    44727     du[1:dropletcount] = dradii
+    44727     du[Int(dropletcount+1):Int(2*dropletcount)] = dosmolarities
+    44727     du[Int(2*dropletcount + dropletcount * dimensions + 1) : end] = dvelocities
+    44727     du[Int(2*dropletcount+1) : Int(dimensions * dropletcount + 2 * dropletcount) ] = dposition
+        -     end
+        - # ===========================================================================================================================================================================
+        - 
+        - 
+        - 
+        - 
+        - 
+        1 function myOvitoPrint!(sol, dropletcount, dimensions)
+        - 
+        -     # This function will recast the solution of our ordinary differential equation into a printed file that can be visualized in ovito.
+        -     
+        1     V = convert(Array,sol) # Convert the ODE solution into an array that can be worked on 
+        1     V = dropdims(V, dims = 2) # Dimension 2 is a singleton and should be eliminated
+        1     V = V'
+        1     tsteps = size(V,1)
+        2     omicron = .~I(dimensions);
+        1     omicron = repeat(omicron, dropletcount, 1)
+        1     omicron = reshape(omicron, dimensions, :)
+        1     omicron = omicron'
+        1     omicron = repeat(omicron, tsteps, 1)
+        1     omicron = reshape(omicron, dimensions*dropletcount, :)
+        -     
+        -     # Shave off the velocities for now 
+        1     W = V[:,2*dropletcount+1:2*dropletcount + dimensions*dropletcount]; ##ADJUST##
+        -     # Perform a sequence of transformations to re-arrange W to what we want
+        1     Wtrue = [W[:,1:2]; W[:,3:4] ; W[:,5:6]]
+        1     Wtransptrue = Wtrue'
+        1     W = W'
+        1     W = repeat(W, 1, dimensions)
+        1     W = W[.~omicron]
+        1     W = reshape(W, dropletcount, :)
+        1     W = W'
+        1     W = reshape(W, tsteps, :)
+        1     W = W'
+        1     W = reshape(W, dimensions, :)
+        1     W = W'
+        -     
+        1     radvector = reshape(V[:,1:dropletcount]',1,:)';
+        1     osmvector = reshape(V[:,dropletcount+1:2*dropletcount]',1,:)'
+        -     
+        1     W = [W radvector osmvector]
+        -     # Now create a unified string vector 
+        1     α = []
+        1     ω = size(W,1)
+        -     
+        2     W = string.(W)
+        2     for i = 1:ω
+    76075         push!(α,join(W[i,:]," "))
+        -     end
+        1     timetitle = ["ITEM: TIMESTEP"];
+        1     timetitle = repeat(timetitle, Int(size(W,1)/dropletcount), 1);
+        -     
+        1     timenumber = convert(Array, sol.t)
+        2     timenumber = string.(timenumber)
+        -     
+        1     dropnumtitle = ["ITEM: NUMBER OF ATOMS"]
+        1     dropnumtitle = repeat(dropnumtitle,Int(size(W,1)/dropletcount),1 )
+        -     
+        1     dropnumnumber = [string.(dropletcount)]
+        1     dropnumnumber = repeat(dropnumnumber, Int(size(W,1)/dropletcount), 1)
+        -     
+        -     
+        1     typetitle = ["ITEM: ATOMS x y z radius osmolarity"]
+        1     typetitle = repeat(typetitle, Int(size(W,1)/dropletcount), 1)
+        -     
+        1     assembly = permutedims([timetitle timenumber dropnumtitle dropnumnumber typetitle])
+        1     assembly = reshape(assembly, :, 1);
+        -     # timenumber dropnumtitle dropnumnumber typetitle]
+        -     
+        1     boolean_me = repeat([["boolean_me"]; repeat(["boolean_me2"],Int(dropletcount-1) ,1)],tsteps,5);
+        1     W = α
+        1     W = [W boolean_me]
+        1     W = permutedims(W) # Seems good to this point
+        1     W = reverse(W, dims = 1)
+        1     W = permutedims(reshape(W,1,:))
+        2     jj = W .== "boolean_me2"
+        1     W= W[.~jj]
+        1     boolean_me = [repeat(["boolean_me2"],4,1); ["boolean_me"]];
+        1     assembly = [assembly repeat(boolean_me,tsteps,dropletcount)]
+        1     assembly = permutedims(assembly)
+        1     assembly = reshape(assembly,1,:)
+        1     assembly = permutedims(assembly)
+        -     
+        1     kk = assembly .== "boolean_me2"
+        1     assembly = assembly[.~kk]
+        1     W = [W assembly]
+        1     W = permutedims(W)
+        1     W = reshape(W,1,:)
+        1     ii = W .== "boolean_me"
+        1     W = W[.~ii]
+        -     
+        1     return W
+        -     
+        -     end
+        -         
+        - 
+        - # Module end here:
+        - end
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - 

@@ -1,0 +1,62 @@
+        2 module MyDropletVectorJ!
+        - include("mydropletvectorjcomponents.jl")
+        - using .MyDropletVectorJComponents
+        - using LinearAlgebra
+        - using DifferentialEquations
+        - export dropvecj!
+        - 
+        2 function dropvecj!(m, k, L , γ, D, timeend, ICmatrix, boolean_osm)
+        - 
+        2 ICvector = reshape(ICmatrix, :, 1);
+        - # Define some of the model parameters 
+        2 dimensions = (size(ICmatrix,2)-2)/2;
+        2 dimensions = Int(dimensions);
+        2 dropletcount = Int(size(ICmatrix,1));
+        2 tspan = (0.0, timeend);
+        - # initialize the two logical matrixes
+        2 ϕ =  .~I(dropletcount);
+        2 ϕ = repeat(ϕ, 1, dimensions);
+        - 
+       74 ζ = I(dropletcount-1);
+        2 ζ = repeat(ζ,dimensions,1);
+        2 ζ = reshape(ζ,(dropletcount-1),:) ;
+        2 ζ = ζ';
+        2 ζ = repeat(ζ,dropletcount,1);
+        2 ζ = reshape(ζ,dimensions*(dropletcount-1),:);
+        - 
+        - 
+        - 
+        - # initialize certain empty matrixes
+     2812 sphere_intersection = zeros(dropletcount, dropletcount-1)
+        - 
+     2812 norm_combinations = zeros(dropletcount,dropletcount-1)
+        - 
+        - 
+     2812 comradii = zeros(dropletcount, dropletcount-1); 
+        - 
+     8436 bilayer_spring_distance = zeros(dropletcount*3, dropletcount-1); 
+        - 
+        - 
+        - 
+        - 
+        - 
+        - # Create the current residual that makes the osmolarity activate after the droplets settle
+        - 
+        - 
+        2 p = [ϕ, ζ, sphere_intersection , norm_combinations,  m, k, L, γ, dropletcount, dimensions, D, boolean_osm, comradii, bilayer_spring_distance] 
+        2 prob = ODEProblem(mydropfun!, ICvector, tspan, p)
+        2 sol = solve(prob, Tsit5(), reltol=1e-8, saveat = 0.1)
+        - 
+        2 W = myOvitoPrint!(sol, dropletcount, dimensions)
+        2 outfile = "E:/Research Scripts and Functions/OVITO_Files/visual_model.ovito"
+        2 f = open(outfile, "w")
+        2 for i in eachindex(W)   
+    86086     println(f, W[i])
+        - end
+        2 close(f)
+        - 
+        - end
+        - 
+        - 
+        - # END module
+        - end
